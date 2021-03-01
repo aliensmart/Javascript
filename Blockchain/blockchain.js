@@ -31,3 +31,102 @@ class Block {
     return this._index;
   }
 }
+
+class Blockchain {
+  constructor() {
+    this._chain = [];
+    this._nodes = new Set();
+    this._current_transactions = [];
+    // Add New Genesis  Block new_block(proof, previous_hash)
+    this.new_block(100, 1);
+    console.log(JSON.stringify(this.chain));
+  }
+
+  get chain() {
+    return this._chain;
+  }
+
+  get nodes() {
+    return this._nodes;
+  }
+
+  set current_transactions(transactions) {
+    this._current_transactions = transactions;
+  }
+
+  get current_transactions() {
+    return this._current_transactions;
+  }
+
+  new_block(proof, previous_hash = null) {
+    var that = this;
+    var previous_index;
+
+    /*  
+            - Important Notice regarding block creation:
+            It is important to always use the constructor when creating blocks to ensure consistent hashes.
+            If we create the block in a different way, then javascript orders the variables in it in different order
+            This creates inconsistent hashes when Object is stringified and hashed since order is altered 
+        */
+    let time = new Date();
+    if (this.chain.length == 0) {
+      previous_index = 0;
+    } else {
+      previous_index = this.chain.length - 1;
+    }
+    let block = new Block(
+      that.chain.length + 1,
+      time,
+      that.current_transactions,
+      previous_hash || this.hash(this.chain[previous_index])
+    );
+    console.log(block);
+    //Reset the current list of transactions
+    this.setCurrent_transactions = [];
+    this.chain.push(block);
+    return block;
+  }
+
+  last_block() {
+    if (this.chain.length == 0) {
+      return 0;
+    }
+    return this.chain[this.chain.length - 1];
+  }
+
+  proof_of_work(last_proof) {
+    let proof = 0;
+    while (!this.valid_proof(last_proof, proof)) {
+      proof += 1;
+    }
+    console.log("Proof Number Found" + proof);
+    return proof;
+  }
+
+  valid_proof(last_proof, proof) {
+    let guess =
+      Buffer.from(proof.toString()).toString("base64") +
+      Buffer.from(last_proof.toString()).toString("base64");
+    let hash = crypto.createHash("sha256").update(guess).digest("base64");
+    return hash.startsWith("0000");
+  }
+
+  new_transaction(sender, recipient, amount) {
+    this.current_transactions.push({
+      sender: sender,
+      recipient: recipient,
+      amount: amount,
+    });
+    if (this.chain.length == 0) {
+      return 1;
+    } else {
+      return this.chain[this.chain.length - 1].index + 1;
+    }
+
+    // console.log(this.current_transactions);
+  }
+}
+
+//end of the blockchain class
+var blockchain = new Blockchain();
+module.exports = blockchain;
