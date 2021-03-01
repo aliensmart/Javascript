@@ -1,5 +1,4 @@
-const { time } = require("console");
-let crypto = require("crypto");
+var createHash = require("crypto");
 const url = require("url");
 
 class Block {
@@ -37,7 +36,7 @@ class Blockchain {
     this._chain = [];
     this._nodes = new Set();
     this._current_transactions = [];
-    // Add New Genesis  Block new_block(proof, previous_hash)
+    //Add genesis block
     this.new_block(100, 1);
     console.log(JSON.stringify(this.chain));
   }
@@ -56,6 +55,51 @@ class Blockchain {
 
   get current_transactions() {
     return this._current_transactions;
+  }
+
+  register_node(address) {
+    var parsed_url = new URL(address); // URL documentation can be found at https://nodejs.org/api/url.html#url_the_whatwg_url_api
+    this._nodes.add(parsed_url);
+  }
+
+  valid_chain(chain_to_check) {
+    var current_index = 1;
+    var last_block = chain_to_check[0];
+    while (current_index < chain_to_check.length) {
+      var block = chain_to_check[current_index];
+      if (block.previous_hash != this.hash(block)) {
+        return false;
+      }
+      if (!this.valid_proof(last_block.proof, block.proof)) {
+        return false;
+      }
+      last_block = block;
+      current_index += 1;
+    }
+    return true;
+  }
+
+  resolve_conflicts() {
+    var neighbours = this.nodes;
+    var that = this;
+    var new_chain = null;
+    var flag = 0;
+    var tmp_length = 0;
+    max_length = this.chain.length;
+    neighbours.forEach((node) => {
+      var xmlHttp = new XMLHttpRequest();
+      xmlHttp.onreadystatechange = function () {
+        if (xmlHttp.readyState == 4 && xmlHttp.status == 200) {
+          var new_chain = JSON.parse(xmlHttp.responseText);
+          if (that.valid_chain(new_chain) && new_chain.length > max_length) {
+            that._chain = new_chain;
+            max_length = new_chain.length;
+          }
+        }
+      };
+      xmlHttp.open("GET", node.origin + "/chain", true); // true for asynchronous
+      xmlHttp.send(null);
+    });
   }
 
   new_block(proof, previous_hash = null) {
@@ -95,11 +139,11 @@ class Blockchain {
   }
 
   proof_of_work(last_proof) {
-    let proof = 0;
+    var proof = 0;
     while (!this.valid_proof(last_proof, proof)) {
       proof += 1;
     }
-    console.log("Proof Number Found" + proof);
+    console.log("Proof number found " + proof);
     return proof;
   }
 
@@ -107,16 +151,29 @@ class Blockchain {
     let guess =
       Buffer.from(proof.toString()).toString("base64") +
       Buffer.from(last_proof.toString()).toString("base64");
-    let hash = crypto.createHash("sha256").update(guess).digest("base64");
+    var hash = createHash.createHash("sha256").update(guess).digest("base64");
     return hash.startsWith("0000");
+  }
+
+  hash(block) {
+    let block_string = JSON.stringify(block);
+    console.log("block " + block_string);
+    let base64_string = Buffer.from(block_string.toString()).toString("base64");
+    var hash = createHash
+      .createHash("sha256")
+      .update(base64_string)
+      .digest("base64");
+    console.log("Creating Hash " + hash);
+    return hash;
   }
 
   new_transaction(sender, recipient, amount) {
     this.current_transactions.push({
       sender: sender,
-      recipient: recipient,
       amount: amount,
+      recipient: recipient,
     });
+    //return the index of the next block to be mined.
     if (this.chain.length == 0) {
       return 1;
     } else {
@@ -127,6 +184,5 @@ class Blockchain {
   }
 }
 
-//end of the blockchain class
 var blockchain = new Blockchain();
 module.exports = blockchain;
